@@ -2,6 +2,26 @@ import os
 import sys
 import subprocess as sp
 import random
+import datetime
+from sqlite3 import *
+
+conn = connect("2048.db")
+curs = conn.cursor()
+# creating the leaderboard table if it does not exist
+sql_table = """
+    CREATE TABLE LEADERBOARD (
+        name text,
+        created timestamp,
+        score integer
+    )
+"""
+try:
+    curs.execute(sql_table)
+except OperationalError:
+    pass
+except:
+    print("Some unexpected error occured. Aborting!")
+    sys.exit()
 
 # Game class to initialize a new game
 class Game:
@@ -65,10 +85,13 @@ class Game:
 
         while((not self.isFull()) or (self.validMoveLeft())):
             sp.call("clear", shell=True)
+            print("Controls: W, A, S, D")
+            print("Q to quit the current game")
             self.printBoard()
             # ask for a move
             moved = False
             inp = input("Enter next move:")
+            inp = inp.upper()
             if (inp == "W"):
                 moved = self.moveUp()
             elif (inp == "S"):
@@ -77,6 +100,8 @@ class Game:
                 moved = self.moveLeft()
             elif (inp == "D"):
                 moved = self.moveRight()
+            elif (inp == "Q"):
+                return
             else:
                 print("Invalid Move!")
                 os.system("pause")
@@ -91,6 +116,16 @@ class Game:
         self.printBoard()
         print("Game Over!")
         print("Final Score: " + str(self.score))
+        user = input("Enter your username to store the result, or press enter to skip.")
+        if (user == ""):
+            return
+        # save the current user in the database with the highscore
+        sql_table = """INSERT INTO 'LEADERBOARD'
+                          ('name', 'created', 'score') 
+                          VALUES (?, ?, ?);"""
+        data_tuple = (user, datetime.datetime.now(), self.score)
+        curs.execute(sql_table, data_tuple)
+        conn.commit()
 
     # printBoard() prints the board to the console
     def printBoard(self):
@@ -205,8 +240,16 @@ def main():
     sp.call("clear", shell=True)
     game = Game()
     while(True):
-        ans = input("Play? y/n\n")
-        if (ans.lower() == "n"):
+        ans = input("Play? y/n (type lb for leaderboard)\n")
+        if (ans.lower() == "lb"):
+            sp.call("clear", shell=True)
+            curs.execute("SELECT * from leaderboard ORDER BY score DESC, created ASC")
+            ans = curs.fetchall()
+            print("Current Leaderboard:\n")
+            for i in ans:
+                print(i)
+            continue
+        elif (ans.lower() == "n"):
             break
         elif (ans.lower() != "y"):
             sp.call("clear", shell=True)
